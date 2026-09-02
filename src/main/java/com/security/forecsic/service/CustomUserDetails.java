@@ -14,7 +14,6 @@ import java.util.List;
 
 public class CustomUserDetails implements UserDetails {
 
-    @Autowired
     private final Register user;
 
     public CustomUserDetails(Register user) {
@@ -48,5 +47,5 @@ public class CustomUserDetails implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
 
     @Override
-    public boolean isEnabled() { return true; }
+    public boolean isEnabled() { return user.isVerified(); }
 }

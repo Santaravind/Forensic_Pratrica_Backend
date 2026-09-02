@@ -37,5 +37,8 @@ public class Register {
     private String email;
 
     @Column(nullable = true)
-    private String role ;   // e.g. USER, ADMIN
+    private String role; // e.g. USER, ADMIN
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean verified = false;
 }
