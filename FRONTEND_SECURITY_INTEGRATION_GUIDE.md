@@ -16,7 +16,7 @@
    - Unverified accounts cannot log in (backend rejects with `400/401` message: *"Account is not verified. Please verify the OTP sent to your email."*).
    - An OTP is a 6-digit numerical code valid for **10 minutes**.
 3. **CORS & Credentials**:
-   - Backend allows origins: `http://localhost:*`, `http://127.0.0.1:*`, `https://*.forensicpatrika.com`.
+   - Backend allows origins: `http://localhost:5173`,`https://www.forensicpatrika.com`.
    - Headers allowed: `Authorization`, `Content-Type`, `*`.
    - Methods: `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`, `PATCH`.
 
