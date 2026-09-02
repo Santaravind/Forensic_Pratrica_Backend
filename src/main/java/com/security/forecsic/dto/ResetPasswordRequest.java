@@ -6,9 +6,9 @@ import lombok.Data;
 
 @Data
 public class ResetPasswordRequest {
-    @NotBlank @Email
+    @NotBlank
+    @Email
     private String email;
-
     @NotBlank
     private String newPassword;
 }
