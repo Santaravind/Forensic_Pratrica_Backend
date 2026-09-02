@@ -1,6 +1,5 @@
 package com.security.forecsic.controller;
 
-
 import com.security.forecsic.dto.*;
 import com.security.forecsic.service.AuthService;
 import jakarta.validation.Valid;
@@ -20,6 +19,18 @@ public class AuthController {
     public ResponseEntity<ApiResponse> register(@Valid @RequestBody RegisterRequest request) {
         ApiResponse response = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<ApiResponse> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        ApiResponse response = authService.verifyOtp(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/resend-otp")
+    public ResponseEntity<ApiResponse> resendOtp(@Valid @RequestBody ResendOtpRequest request) {
+        ApiResponse response = authService.resendOtp(request);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/login")
