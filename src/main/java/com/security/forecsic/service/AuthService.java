@@ -2,7 +2,7 @@ package com.security.forecsic.service;
 
 import com.security.forecsic.dto.*;
 import com.security.forecsic.model.Register;
-import com.security.forecsic.repositery.RegisterRepository;
+import com.security.forecsic.repositery.jpa.RegisterRepository;
 import com.security.forecsic.utilits.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -108,7 +108,12 @@ public class AuthService {
         }
 
         CustomUserDetails userDetails = new CustomUserDetails(user);
-        String token = jwtUtil.generateToken(userDetails);
+        java.util.Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put("role", user.getRole() != null ? user.getRole().toUpperCase() : "USER");
+        claims.put("email", user.getEmail());
+        claims.put("fullName", user.getFullName());
+        claims.put("id", user.getId());
+        String token = jwtUtil.generateToken(userDetails, claims);
 
         return new TokenResponse(token);
     }

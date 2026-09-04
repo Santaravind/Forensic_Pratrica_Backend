@@ -1,4 +1,4 @@
-package com.security.forecsic.repositery;
+package com.security.forecsic.repositery.jpa;
 
 import com.security.forecsic.model.OtpVerification;
 import org.springframework.data.jpa.repository.JpaRepository;

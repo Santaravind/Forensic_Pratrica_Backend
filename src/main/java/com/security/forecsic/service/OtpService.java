@@ -1,7 +1,7 @@
 package com.security.forecsic.service;
 
 import com.security.forecsic.model.OtpVerification;
-import com.security.forecsic.repositery.OtpVerificationRepository;
+import com.security.forecsic.repositery.jpa.OtpVerificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
