@@ -58,11 +58,22 @@ public class SecurityConfig {
                         // Public authentication endpoints
                         .requestMatchers("/auth/**").permitAll()
 
+                        // Public catalog & verification endpoints
+                        .requestMatchers("/api/public/**").permitAll()
+
+                        // Public research paper submission & tracking endpoints
+                        .requestMatchers(HttpMethod.POST, "/api/research-papers/submit", "/api/research-papers/submit-with-file", "/api/research-papers/upload").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/research-papers/track/**", "/api/research-papers/*").permitAll()
+
                         // Public blog reading endpoints
                         .requestMatchers(HttpMethod.GET, "/api/blogs", "/api/blogs/*", "/blogpost", "/blogpost/*").permitAll()
 
                         // Admin blog moderation endpoints require privileged roles
                         .requestMatchers(HttpMethod.GET, "/api/blogs/admin/**", "/blogpost/admin/**").hasAnyRole("ADMIN", "PUBLISHER", "EDITOR")
+
+                        // Publisher & Admin Portal endpoints
+                        .requestMatchers("/api/publisher/**").hasAnyRole("PUBLISHER", "ADMIN")
+                        .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "PUBLISHER", "EDITOR")
 
                         // Any other requests require authentication
                         .anyRequest().authenticated()
