@@ -58,12 +58,21 @@ public class SecurityConfig {
                         // Public authentication endpoints
                         .requestMatchers("/auth/**").permitAll()
 
-                        // Public catalog & verification endpoints
+                        // Public catalog & certificate verification endpoints
                         .requestMatchers("/api/public/**").permitAll()
 
                         // Public research paper submission & tracking endpoints
-                        .requestMatchers(HttpMethod.POST, "/api/research-papers/submit", "/api/research-papers/submit-with-file", "/api/research-papers/upload").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/research-papers/track/**", "/api/research-papers/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/research-papers/submit", "/api/research-papers/submit-with-file").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/research-papers/track/**").permitAll()
+
+                        // Author private submissions endpoint
+                        .requestMatchers(HttpMethod.GET, "/api/research-papers/my-submissions").authenticated()
+
+                        // Standalone paper document uploads require authentication
+                        .requestMatchers(HttpMethod.POST, "/api/research-papers/upload").authenticated()
+
+                        // Research paper moderation and full repository inspection require privileged roles
+                        .requestMatchers(HttpMethod.GET, "/api/research-papers", "/api/research-papers/*").hasAnyRole("ADMIN", "PUBLISHER", "EDITOR")
 
                         // Public blog reading endpoints
                         .requestMatchers(HttpMethod.GET, "/api/blogs", "/api/blogs/*", "/blogpost", "/blogpost/*").permitAll()

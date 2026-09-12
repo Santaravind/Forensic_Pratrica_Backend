@@ -25,52 +25,48 @@ public class AuthService {
     public ApiResponse register(RegisterRequest request) {
         Optional<Register> existingUserOpt = registerRepository.findByEmail(request.getEmail());
 
-        Register user;
         if (existingUserOpt.isPresent()) {
-            user = existingUserOpt.get();
-            if (user.isVerified()) {
+            Register existingUser = existingUserOpt.get();
+            if (existingUser.isVerified()) {
                 throw new IllegalArgumentException("Email already registered and verified. Please log in.");
             }
-            // Update details for unverified user re-attempting registration
-            user.setFullName(request.getFullName());
-            user.setOrganization(request.getOrganization());
-            user.setDomain(request.getDomain());
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
-            user.setMobileNo(Long.parseLong(request.getMobileNo()));
-            user.setRole(request.getRole());
-        } else {
-            if (registerRepository.existsByMobileNo(Long.parseLong(request.getMobileNo()))) {
-                throw new IllegalArgumentException("Mobile number already registered");
-            }
-
-            user = new Register();
-            user.setFullName(request.getFullName());
-            user.setOrganization(request.getOrganization());
-            user.setDomain(request.getDomain());
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
-            user.setMobileNo(Long.parseLong(request.getMobileNo()));
-            user.setEmail(request.getEmail());
-            user.setRole(request.getRole());
-            user.setVerified(false);
+            // For existing unverified user, resend OTP to prevent arbitrary detail tampering
+            otpService.sendRegistrationOtp(existingUser.getEmail());
+            return new ApiResponse(true, "An unverified account exists for this email. A fresh OTP has been sent to complete your verification.");
         }
+
+        if (registerRepository.existsByMobileNo(Long.parseLong(request.getMobileNo()))) {
+            throw new IllegalArgumentException("Mobile number already registered");
+        }
+
+        Register user = new Register();
+        user.setFullName(request.getFullName().trim());
+        user.setOrganization(request.getOrganization().trim());
+        user.setDomain(request.getDomain().trim());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setMobileNo(Long.parseLong(request.getMobileNo()));
+        user.setEmail(request.getEmail().trim().toLowerCase());
+        // Enforce USER role for all public self-registrations to prevent privilege escalation
+        user.setRole("USER");
+        user.setVerified(false);
 
         registerRepository.save(user);
 
         // Send OTP via Resend
         otpService.sendRegistrationOtp(user.getEmail());
 
-        return new ApiResponse(true, "OTP sent to your email. Please verify your OTP to complete registration.");
+        return new ApiResponse(true, "Registration initiated! OTP sent to your email. Please verify your OTP to complete registration.");
     }
 
     public ApiResponse verifyOtp(VerifyOtpRequest request) {
-        Register user = registerRepository.findByEmail(request.getEmail())
+        Register user = registerRepository.findByEmail(request.getEmail().trim().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("No account found with email: " + request.getEmail()));
 
         if (user.isVerified()) {
             return new ApiResponse(true, "Account is already verified. You can log in.");
         }
 
-        otpService.verifyRegistrationOtp(request.getEmail(), request.getOtp());
+        otpService.verifyRegistrationOtp(request.getEmail().trim().toLowerCase(), request.getOtp());
 
         user.setVerified(true);
         registerRepository.save(user);
@@ -79,7 +75,7 @@ public class AuthService {
     }
 
     public ApiResponse resendOtp(ResendOtpRequest request) {
-        Register user = registerRepository.findByEmail(request.getEmail())
+        Register user = registerRepository.findByEmail(request.getEmail().trim().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("No account found with email: " + request.getEmail()));
 
         if (user.isVerified()) {
@@ -92,7 +88,7 @@ public class AuthService {
     }
 
     public TokenResponse login(LoginRequest request) {
-        Register user = registerRepository.findByEmail(request.getEmail())
+        Register user = registerRepository.findByEmail(request.getEmail().trim().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
 
         if (!user.isVerified()) {
@@ -100,7 +96,7 @@ public class AuthService {
         }
 
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(request.getEmail().trim().toLowerCase(), request.getPassword())
         );
 
         if (!user.getRole().equalsIgnoreCase(request.getRole())) {
@@ -118,13 +114,29 @@ public class AuthService {
         return new TokenResponse(token);
     }
 
+    public ApiResponse forgotPassword(ForgotPasswordRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+        Optional<Register> userOpt = registerRepository.findByEmail(email);
+
+        if (userOpt.isPresent() && userOpt.get().isVerified()) {
+            otpService.sendPasswordResetOtp(email);
+        }
+
+        // Return a consistent message to mitigate user enumeration
+        return new ApiResponse(true, "If an active account exists for " + email + ", a password reset OTP has been dispatched to your email.");
+    }
+
     public ApiResponse resetPassword(ResetPasswordRequest request) {
-        Register user = registerRepository.findByEmail(request.getEmail())
+        String email = request.getEmail().trim().toLowerCase();
+        Register user = registerRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("No account found with this email"));
+
+        // Enforce OTP verification before allowing password change
+        otpService.verifyPasswordResetOtp(email, request.getOtp());
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         registerRepository.save(user);
 
-        return new ApiResponse(true, "Password reset successfully");
+        return new ApiResponse(true, "Password has been reset successfully. You can now log in with your new password.");
     }
 }

@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -116,8 +117,9 @@ public class ResearchPaperController {
         return ResponseEntity.ok(paper);
     }
 
-    // 6. Get All Papers (with optional status, search, and pagination)
+    // 6. Get All Papers (Privileged: Admins, Publishers, Editors only)
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'PUBLISHER', 'EDITOR')")
     public ResponseEntity<Map<String, Object>> getAllPapers(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
@@ -125,5 +127,18 @@ public class ResearchPaperController {
             @RequestParam(defaultValue = "10") int limit
     ) {
         return ResponseEntity.ok(researchPaperService.getAllPapers(status, search, page, limit));
+    }
+
+    // 7. Get Author's Own Submitted Papers
+    @GetMapping("/my-submissions")
+    public ResponseEntity<Map<String, Object>> getMySubmissions(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        if (userDetails == null || userDetails.getId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("success", false, "message", "User session expired or invalid"));
+        }
+        return ResponseEntity.ok(researchPaperService.getUserSubmissions(userDetails.getId(), page, limit));
     }
 }

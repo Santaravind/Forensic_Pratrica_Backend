@@ -31,6 +31,8 @@ public class OtpService {
         return String.valueOf(otpNumber);
     }
 
+    private static final int MAX_OTP_ATTEMPTS = 5;
+
     @Transactional
     public void sendRegistrationOtp(String email) {
         // Invalidate previous registration OTPs for this email
@@ -43,6 +45,7 @@ public class OtpService {
         otpVerification.setEmail(email);
         otpVerification.setOtp(otp);
         otpVerification.setType("REGISTRATION");
+        otpVerification.setAttempts(0);
         otpVerification.setExpiryTime(expiryTime);
         otpVerification.setCreatedAt(LocalDateTime.now());
 
@@ -53,21 +56,61 @@ public class OtpService {
 
     @Transactional
     public boolean verifyRegistrationOtp(String email, String submittedOtp) {
+        return verifyOtpInternal(email, submittedOtp, "REGISTRATION");
+    }
+
+    @Transactional
+    public void sendPasswordResetOtp(String email) {
+        // Invalidate previous password reset OTPs for this email
+        otpVerificationRepository.deleteByEmailAndType(email, "PASSWORD_RESET");
+
+        String otp = generateNumericOtp(6);
+        LocalDateTime expiryTime = LocalDateTime.now().plusMinutes(expirationMinutes);
+
+        OtpVerification otpVerification = new OtpVerification();
+        otpVerification.setEmail(email);
+        otpVerification.setOtp(otp);
+        otpVerification.setType("PASSWORD_RESET");
+        otpVerification.setAttempts(0);
+        otpVerification.setExpiryTime(expiryTime);
+        otpVerification.setCreatedAt(LocalDateTime.now());
+
+        otpVerificationRepository.save(otpVerification);
+
+        emailService.sendPasswordResetOtpEmail(email, otp, expirationMinutes);
+    }
+
+    @Transactional
+    public boolean verifyPasswordResetOtp(String email, String submittedOtp) {
+        return verifyOtpInternal(email, submittedOtp, "PASSWORD_RESET");
+    }
+
+    private boolean verifyOtpInternal(String email, String submittedOtp, String type) {
         OtpVerification otpVerification = otpVerificationRepository
-                .findTopByEmailAndTypeOrderByCreatedAtDesc(email, "REGISTRATION")
-                .orElseThrow(() -> new IllegalArgumentException("No OTP requested for this email. Please request a new OTP."));
+                .findTopByEmailAndTypeOrderByCreatedAtDesc(email, type)
+                .orElseThrow(() -> new IllegalArgumentException("No verification code requested for this email. Please request a new OTP."));
 
         if (LocalDateTime.now().isAfter(otpVerification.getExpiryTime())) {
-            otpVerificationRepository.deleteByEmailAndType(email, "REGISTRATION");
-            throw new IllegalArgumentException("OTP has expired. Please request a new OTP.");
+            otpVerificationRepository.deleteByEmailAndType(email, type);
+            throw new IllegalArgumentException("Verification code has expired. Please request a new OTP.");
         }
 
         if (!otpVerification.getOtp().equals(submittedOtp.trim())) {
-            throw new IllegalArgumentException("Invalid OTP. Please check the code and try again.");
+            int newAttempts = otpVerification.getAttempts() + 1;
+            otpVerification.setAttempts(newAttempts);
+
+            if (newAttempts >= MAX_OTP_ATTEMPTS) {
+                otpVerificationRepository.deleteByEmailAndType(email, type);
+                throw new IllegalArgumentException("Too many incorrect attempts. For security, this verification code is invalidated. Please request a new OTP.");
+            }
+
+            otpVerificationRepository.save(otpVerification);
+            int remaining = MAX_OTP_ATTEMPTS - newAttempts;
+            throw new IllegalArgumentException("Invalid verification code. " + remaining + " attempt(s) remaining.");
         }
 
         // Successfully verified - clean up OTP
-        otpVerificationRepository.deleteByEmailAndType(email, "REGISTRATION");
+        otpVerificationRepository.deleteByEmailAndType(email, type);
         return true;
     }
 }

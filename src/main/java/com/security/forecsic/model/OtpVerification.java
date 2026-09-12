@@ -32,6 +32,9 @@ public class OtpVerification {
     @Column(nullable = false)
     private String type; // e.g. REGISTRATION, PASSWORD_RESET
 
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    private int attempts = 0;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 }
