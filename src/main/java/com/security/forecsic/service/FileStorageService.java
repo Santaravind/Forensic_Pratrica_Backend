@@ -22,6 +22,24 @@ public class FileStorageService {
             "pdf", "doc", "docx", "png", "jpg", "jpeg"
     );
 
+    private static final Set<String> ALLOWED_MIME_TYPES = Set.of(
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "image/png",
+            "image/jpeg",
+            "image/jpg",
+            "application/octet-stream" // for raw document uploads from some browsers
+    );
+
+    private static final Set<String> ALLOWED_FOLDERS = Set.of(
+            "research_papers",
+            "published_papers",
+            "certificates",
+            "blogs",
+            "journal_covers"
+    );
+
     /**
      * Upload DOC, DOCX, PDF, or Image file to Cloudinary
      */
@@ -40,9 +58,19 @@ public class FileStorageService {
             throw new IllegalArgumentException("Invalid file type ." + extension + ". Supported formats are DOC, DOCX, PDF, PNG, JPG.");
         }
 
-        String folder = (folderName != null && !folderName.isBlank()) ? folderName : "research_papers";
+        // Validate MIME type
+        String contentType = file.getContentType();
+        if (contentType != null && !contentType.isBlank() && !ALLOWED_MIME_TYPES.contains(contentType.toLowerCase())) {
+            throw new IllegalArgumentException("Invalid file content type: " + contentType);
+        }
+
+        // Whitelist destination folder to prevent path traversal
+        String targetFolder = (folderName != null && ALLOWED_FOLDERS.contains(folderName.trim().toLowerCase()))
+                ? folderName.trim().toLowerCase()
+                : "research_papers";
+
         String cleanBaseName = originalFilename.replaceAll("[^a-zA-Z0-9.-]", "_");
-        String publicId = folder + "/" + UUID.randomUUID() + "_" + cleanBaseName;
+        String publicId = targetFolder + "/" + UUID.randomUUID() + "_" + cleanBaseName;
 
         try {
             // Use 'raw' resource_type for doc, docx, pdf; 'auto' for others

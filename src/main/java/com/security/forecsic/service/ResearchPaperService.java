@@ -201,6 +201,27 @@ public class ResearchPaperService {
         return response;
     }
 
+    /**
+     * Get papers submitted by the authenticated user
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getUserSubmissions(Integer userId, int page, int limit) {
+        if (userId == null) {
+            throw new IllegalArgumentException("User identifier is required.");
+        }
+
+        Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.max(1, limit), Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<ResearchPaper> paperPage = researchPaperRepository.findBySubmittedById(userId, pageable);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("data", paperPage.getContent());
+        response.put("total", paperPage.getTotalElements());
+        response.put("totalPages", paperPage.getTotalPages());
+        response.put("currentPage", page);
+        return response;
+    }
+
     private String generateUniqueSubmissionId() {
         Random random = new Random();
         int currentYear = Year.now().getValue();

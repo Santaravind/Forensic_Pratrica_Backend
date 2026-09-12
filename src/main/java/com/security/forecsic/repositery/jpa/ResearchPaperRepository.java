@@ -23,6 +23,8 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, UU
 
     Page<ResearchPaper> findByStatus(String status, Pageable pageable);
 
+    Page<ResearchPaper> findBySubmittedById(Integer userId, Pageable pageable);
+
     long countByStatus(String status);
 
     @Query("SELECT COUNT(r) FROM ResearchPaper r")

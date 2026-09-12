@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import org.springframework.web.util.HtmlUtils;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -33,20 +34,38 @@ public class EmailService {
     private static final String RESEND_API_URL = "https://api.resend.com/emails";
 
     /**
-     * Send OTP Verification Email
+     * Send OTP Verification Email for Registration
      */
     public void sendOtpEmail(String toEmail, String otp, int expirationMinutes) {
         if (resendApiKey == null || resendApiKey.isBlank()) {
-            log.warn("RESEND_API_KEY is not configured! OTP for {} is: {}", toEmail, otp);
+            log.warn("RESEND_API_KEY is not configured! Registration OTP for {} is: {}", toEmail, otp);
             return;
         }
 
         try {
-            String htmlContent = buildOtpEmailHtml(otp, expirationMinutes);
+            String htmlContent = buildOtpEmailHtml(otp, expirationMinutes, "Registration Verification");
             sendEmailViaResend(toEmail, "Your Verification Code: " + otp, htmlContent);
         } catch (Exception e) {
             log.error("Error sending OTP email to {}", toEmail, e);
             throw new RuntimeException("Error occurred while sending verification email: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Send OTP Verification Email for Password Reset
+     */
+    public void sendPasswordResetOtpEmail(String toEmail, String otp, int expirationMinutes) {
+        if (resendApiKey == null || resendApiKey.isBlank()) {
+            log.warn("RESEND_API_KEY is not configured! Password Reset OTP for {} is: {}", toEmail, otp);
+            return;
+        }
+
+        try {
+            String htmlContent = buildOtpEmailHtml(otp, expirationMinutes, "Password Reset");
+            sendEmailViaResend(toEmail, "Password Reset Code: " + otp, htmlContent);
+        } catch (Exception e) {
+            log.error("Error sending password reset OTP email to {}", toEmail, e);
+            throw new RuntimeException("Error occurred while sending password reset email: " + e.getMessage(), e);
         }
     }
 
@@ -159,14 +178,17 @@ public class EmailService {
         }
     }
 
-    private String buildOtpEmailHtml(String otp, int expirationMinutes) {
+    private String buildOtpEmailHtml(String otp, int expirationMinutes, String purposeTitle) {
+        String safePurpose = HtmlUtils.htmlEscape(purposeTitle != null ? purposeTitle : "Email Verification");
+        String safeOtp = HtmlUtils.htmlEscape(otp);
+
         return """
             <!DOCTYPE html>
             <html>
             <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Email Verification</title>
+              <title>{{PURPOSE}}</title>
               <style>
                 body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333333; }
                 .container { max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
@@ -183,10 +205,10 @@ public class EmailService {
             <body>
               <div class="container">
                 <div class="header">
-                  <h1>Verification Code</h1>
+                  <h1>{{PURPOSE}}</h1>
                 </div>
                 <div class="content">
-                  <p>Welcome to Forensic Patrika! Please use the following One-Time Password (OTP) to complete your verification:</p>
+                  <p>Please use the following One-Time Password (OTP) to complete your verification:</p>
                   <div class="otp-box">
                     <span class="otp-code">{{OTP}}</span>
                   </div>
@@ -194,7 +216,7 @@ public class EmailService {
                     <span class="badge">&#9201; Expires in {{EXPIRATION}} minutes</span>
                   </div>
                   <p style="font-size: 13px; color: #6b7280; margin-top: 10px;">
-                    If you did not request this registration, you can safely ignore this email.
+                    If you did not make this request, you can safely ignore this email.
                   </p>
                 </div>
                 <div class="footer">
@@ -204,7 +226,8 @@ public class EmailService {
             </body>
             </html>
             """
-                .replace("{{OTP}}", otp)
+                .replace("{{PURPOSE}}", safePurpose)
+                .replace("{{OTP}}", safeOtp)
                 .replace("{{EXPIRATION}}", String.valueOf(expirationMinutes))
                 .replace("{{YEAR}}", String.valueOf(Year.now().getValue()));
     }
@@ -215,6 +238,11 @@ public class EmailService {
             String paperTitle,
             String researchArea
     ) {
+        String safeAuthor = HtmlUtils.htmlEscape(authorName != null ? authorName : "Author");
+        String safeSubId = HtmlUtils.htmlEscape(submissionId);
+        String safeTitle = HtmlUtils.htmlEscape(paperTitle);
+        String safeArea = HtmlUtils.htmlEscape(researchArea != null ? researchArea : "Forensic Science");
+
         return """
             <!DOCTYPE html>
             <html>
@@ -291,10 +319,10 @@ public class EmailService {
             </body>
             </html>
             """
-                .replace("{{AUTHOR_NAME}}", authorName != null ? authorName : "Author")
-                .replace("{{SUBMISSION_ID}}", submissionId)
-                .replace("{{PAPER_TITLE}}", paperTitle)
-                .replace("{{RESEARCH_AREA}}", researchArea != null ? researchArea : "Forensic Science")
+                .replace("{{AUTHOR_NAME}}", safeAuthor)
+                .replace("{{SUBMISSION_ID}}", safeSubId)
+                .replace("{{PAPER_TITLE}}", safeTitle)
+                .replace("{{RESEARCH_AREA}}", safeArea)
                 .replace("{{YEAR}}", String.valueOf(Year.now().getValue()));
     }
 
@@ -306,6 +334,11 @@ public class EmailService {
             String certificateUrl,
             String paperUrl
     ) {
+        String safeAuthor = HtmlUtils.htmlEscape(authorName != null ? authorName : "Author");
+        String safePaper = HtmlUtils.htmlEscape(paperTitle);
+        String safeJournal = HtmlUtils.htmlEscape(journalTitle != null ? journalTitle : "Forensic Patrika Journal");
+        String safeDoi = HtmlUtils.htmlEscape(doi);
+
         return """
             <!DOCTYPE html>
             <html>
@@ -361,10 +394,10 @@ public class EmailService {
             </body>
             </html>
             """
-                .replace("{{AUTHOR_NAME}}", authorName != null ? authorName : "Author")
-                .replace("{{PAPER_TITLE}}", paperTitle)
-                .replace("{{JOURNAL_TITLE}}", journalTitle != null ? journalTitle : "Forensic Patrika Journal")
-                .replace("{{DOI}}", doi)
+                .replace("{{AUTHOR_NAME}}", safeAuthor)
+                .replace("{{PAPER_TITLE}}", safePaper)
+                .replace("{{JOURNAL_TITLE}}", safeJournal)
+                .replace("{{DOI}}", safeDoi)
                 .replace("{{CERTIFICATE_URL}}", certificateUrl != null ? certificateUrl : "#")
                 .replace("{{PAPER_URL}}", paperUrl != null ? paperUrl : "#")
                 .replace("{{YEAR}}", String.valueOf(Year.now().getValue()));
@@ -377,6 +410,12 @@ public class EmailService {
             String paperTitle,
             String senderName
     ) {
+        String safeSubject = HtmlUtils.htmlEscape(subject);
+        String safeAuthor = HtmlUtils.htmlEscape(authorName != null ? authorName : "Author");
+        String safeContent = HtmlUtils.htmlEscape(messageContent != null ? messageContent : "").replace("\n", "<br/>");
+        String safeTitle = (paperTitle != null && !paperTitle.isBlank()) ? HtmlUtils.htmlEscape(paperTitle) : null;
+        String safeSender = HtmlUtils.htmlEscape(senderName != null ? senderName : "Publishing Team");
+
         return """
             <!DOCTYPE html>
             <html>
@@ -423,12 +462,12 @@ public class EmailService {
             </body>
             </html>
             """
-                .replace("{{SUBJECT}}", subject)
-                .replace("{{AUTHOR_NAME}}", authorName != null ? authorName : "Author")
-                .replace("{{PAPER_INFO}}", (paperTitle != null && !paperTitle.isBlank()) ?
-                        "<div class=\"paper-info\"><strong>Regarding Manuscript:</strong> " + paperTitle + "</div>" : "")
-                .replace("{{MESSAGE_CONTENT}}", messageContent)
-                .replace("{{SENDER_NAME}}", senderName != null ? senderName : "Publishing Team")
+                .replace("{{SUBJECT}}", safeSubject)
+                .replace("{{AUTHOR_NAME}}", safeAuthor)
+                .replace("{{PAPER_INFO}}", (safeTitle != null) ?
+                        "<div class=\"paper-info\"><strong>Regarding Manuscript:</strong> " + safeTitle + "</div>" : "")
+                .replace("{{MESSAGE_CONTENT}}", safeContent)
+                .replace("{{SENDER_NAME}}", safeSender)
                 .replace("{{YEAR}}", String.valueOf(Year.now().getValue()));
     }
 }
