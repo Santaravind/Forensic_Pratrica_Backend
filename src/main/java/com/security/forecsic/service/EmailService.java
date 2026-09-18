@@ -1,6 +1,8 @@
 package com.security.forecsic.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.security.forecsic.dto.AdminSendEmailRequest;
+import com.security.forecsic.model.Register;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -151,12 +153,79 @@ public class EmailService {
         }
     }
 
+    /**
+     * Send Custom / Direct Email composed by Administrator from dashboard
+     */
+    public void sendAdminCustomEmail(AdminSendEmailRequest request, Register sender) {
+        if (request == null || request.getTo() == null || request.getTo().isBlank()) {
+            throw new IllegalArgumentException("Recipient email cannot be empty");
+        }
+
+        String toEmail = request.getTo().trim();
+        String subject = (request.getSubject() != null && !request.getSubject().isBlank())
+                ? request.getSubject().trim()
+                : "Official Communication - Forensic Patrika";
+
+        String senderName = (request.getSenderName() != null && !request.getSenderName().isBlank())
+                ? request.getSenderName().trim()
+                : ((sender != null && sender.getFullName() != null && !sender.getFullName().isBlank())
+                    ? sender.getFullName().trim()
+                    : "Forensic Patrika Administration");
+
+        String senderTitle = (request.getSenderTitle() != null && !request.getSenderTitle().isBlank())
+                ? request.getSenderTitle().trim()
+                : "Editorial & Administrative Board";
+
+        log.info("Admin [{}] sending direct custom email to [{}] with subject [{}]", senderName, toEmail, subject);
+
+        if (resendApiKey == null || resendApiKey.isBlank()) {
+            log.warn("RESEND_API_KEY is not configured. Skipping live email dispatch to: {}", toEmail);
+            return;
+        }
+
+        try {
+            String htmlContent = buildAdminCustomEmailHtml(request, senderName, senderTitle);
+            sendEmailViaResend(
+                    toEmail,
+                    subject,
+                    htmlContent,
+                    request.getCc(),
+                    request.getBcc(),
+                    request.getReplyTo()
+            );
+        } catch (Exception e) {
+            log.error("Failed to send admin custom email to {}", toEmail, e);
+            throw new RuntimeException("Failed to send email to " + toEmail + ": " + e.getMessage(), e);
+        }
+    }
+
     private void sendEmailViaResend(String toEmail, String subject, String htmlContent) throws Exception {
+        sendEmailViaResend(toEmail, subject, htmlContent, null, null, null);
+    }
+
+    private void sendEmailViaResend(
+            String toEmail,
+            String subject,
+            String htmlContent,
+            List<String> cc,
+            List<String> bcc,
+            String replyTo
+    ) throws Exception {
         Map<String, Object> payload = new HashMap<>();
         payload.put("from", fromEmail);
         payload.put("to", List.of(toEmail));
         payload.put("subject", subject);
         payload.put("html", htmlContent);
+
+        if (cc != null && !cc.isEmpty()) {
+            payload.put("cc", cc);
+        }
+        if (bcc != null && !bcc.isEmpty()) {
+            payload.put("bcc", bcc);
+        }
+        if (replyTo != null && !replyTo.isBlank()) {
+            payload.put("reply_to", replyTo.trim());
+        }
 
         String requestBody = objectMapper.writeValueAsString(payload);
 
@@ -469,5 +538,103 @@ public class EmailService {
                 .replace("{{MESSAGE_CONTENT}}", safeContent)
                 .replace("{{SENDER_NAME}}", safeSender)
                 .replace("{{YEAR}}", String.valueOf(Year.now().getValue()));
+    }
+
+    private String buildAdminCustomEmailHtml(
+            AdminSendEmailRequest request,
+            String senderName,
+            String senderTitle
+    ) {
+        String safeSubject = HtmlUtils.htmlEscape(request.getSubject() != null ? request.getSubject().trim() : "Forensic Patrika");
+        String safeRecipientName = (request.getRecipientName() != null && !request.getRecipientName().isBlank())
+                ? HtmlUtils.htmlEscape(request.getRecipientName().trim())
+                : null;
+
+        String formattedMessage;
+        if (request.isHtml()) {
+            formattedMessage = request.getMessage() != null ? request.getMessage() : "";
+        } else {
+            String escaped = HtmlUtils.htmlEscape(request.getMessage() != null ? request.getMessage() : "");
+            formattedMessage = escaped.replace("\n", "<br/>");
+        }
+
+        String safeSender = HtmlUtils.htmlEscape(senderName);
+        String safeTitle = HtmlUtils.htmlEscape(senderTitle);
+
+        String greeting = (safeRecipientName != null)
+                ? "Dear " + safeRecipientName + ","
+                : "Hello,";
+
+        String buttonHtml = "";
+        if (request.getButtonUrl() != null && !request.getButtonUrl().isBlank()) {
+            String btnText = (request.getButtonText() != null && !request.getButtonText().isBlank())
+                    ? HtmlUtils.htmlEscape(request.getButtonText().trim())
+                    : "Access Portal";
+            String btnUrl = HtmlUtils.htmlEscape(request.getButtonUrl().trim());
+            buttonHtml = """
+                <div style="text-align: center; margin: 28px 0;">
+                  <a href="%s" style="display: inline-block; padding: 13px 28px; background: linear-gradient(135deg, #1e1b4b 0%%, #4338ca 100%%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(67, 56, 202, 0.25);">
+                    %s
+                  </a>
+                </div>
+                """.formatted(btnUrl, btnText);
+        }
+
+        return """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>%s</title>
+              <style>
+                body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px; color: #1e293b; }
+                .container { max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+                .header { background: linear-gradient(135deg, #0f172a 0%%, #1e293b 50%%, #312e81 100%%); padding: 34px 28px; text-align: center; color: #ffffff; }
+                .header h1 { margin: 0; font-size: 23px; font-weight: 700; letter-spacing: 0.5px; }
+                .header p { margin: 6px 0 0 0; font-size: 13px; color: #94a3b8; letter-spacing: 0.3px; }
+                .content { padding: 32px 30px; }
+                .greeting { font-size: 16px; font-weight: 600; color: #0f172a; margin-bottom: 18px; }
+                .message-body { font-size: 15px; line-height: 1.75; color: #334155; background: #f8fafc; padding: 22px; border-radius: 10px; border-left: 4px solid #4f46e5; margin-bottom: 24px; }
+                .signoff { font-size: 14px; color: #475569; border-top: 1px solid #f1f5f9; padding-top: 18px; line-height: 1.6; }
+                .footer { background-color: #f8fafc; padding: 22px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; line-height: 1.5; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>Forensic Patrika</h1>
+                  <p>Official Journal & Administrative Communication</p>
+                </div>
+                <div class="content">
+                  <div class="greeting">%s</div>
+                  <div class="message-body">
+                    %s
+                  </div>
+                  %s
+                  <div class="signoff">
+                    Warm regards,<br/>
+                    <strong style="color: #0f172a;">%s</strong><br/>
+                    <span style="color: #64748b; font-size: 13px;">%s</span><br/>
+                    <em style="color: #4f46e5; font-size: 12px;">Forensic Patrika Platform</em>
+                  </div>
+                </div>
+                <div class="footer">
+                  This is an official communication dispatched from the Forensic Patrika Portal.<br/>
+                  &copy; %d Forensic Patrika &bull; All Rights Reserved.
+                </div>
+              </div>
+            </body>
+            </html>
+            """
+                .formatted(
+                        safeSubject,
+                        greeting,
+                        formattedMessage,
+                        buttonHtml,
+                        safeSender,
+                        safeTitle,
+                        Year.now().getValue()
+                );
     }
 }
