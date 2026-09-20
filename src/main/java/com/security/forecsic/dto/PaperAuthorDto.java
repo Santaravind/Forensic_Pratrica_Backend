@@ -24,10 +24,18 @@ public class PaperAuthorDto {
     private String university;
 
     @JsonAlias({"isFirstAuthor", "firstAuthor", "is_first_author"})
-    private boolean isFirstAuthor;
+    private Boolean isFirstAuthor;
 
     @JsonAlias({"isCorrespondingAuthor", "correspondingAuthor", "is_corresponding_author"})
-    private boolean isCorrespondingAuthor;
+    private Boolean isCorrespondingAuthor;
+
+    public boolean isFirstAuthor() {
+        return Boolean.TRUE.equals(this.isFirstAuthor);
+    }
+
+    public boolean isCorrespondingAuthor() {
+        return Boolean.TRUE.equals(this.isCorrespondingAuthor);
+    }
 
     @JsonAlias({"authorOrder", "order", "author_order"})
     private Integer authorOrder;

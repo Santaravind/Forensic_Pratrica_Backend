@@ -48,7 +48,11 @@ public class AdminSendEmailRequest {
      * Set to true if the message content contains custom HTML tags
      */
     @Builder.Default
-    private boolean isHtml = false;
+    private Boolean isHtml = false;
+
+    public boolean isHtml() {
+        return Boolean.TRUE.equals(this.isHtml);
+    }
 
     /**
      * Optional custom sender name (defaults to authenticated Admin's name)
