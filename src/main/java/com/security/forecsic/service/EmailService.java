@@ -212,16 +212,30 @@ public class EmailService {
             String replyTo
     ) throws Exception {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("from", fromEmail);
-        payload.put("to", List.of(toEmail));
-        payload.put("subject", subject);
+
+        String sender = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail.trim() : "onboarding@resend.dev";
+        payload.put("from", sender);
+        payload.put("to", List.of(toEmail.trim()));
+        payload.put("subject", subject != null ? subject.trim() : "Notification");
         payload.put("html", htmlContent);
 
         if (cc != null && !cc.isEmpty()) {
-            payload.put("cc", cc);
+            List<String> validCc = cc.stream()
+                    .filter(s -> s != null && !s.isBlank())
+                    .map(String::trim)
+                    .toList();
+            if (!validCc.isEmpty()) {
+                payload.put("cc", validCc);
+            }
         }
         if (bcc != null && !bcc.isEmpty()) {
-            payload.put("bcc", bcc);
+            List<String> validBcc = bcc.stream()
+                    .filter(s -> s != null && !s.isBlank())
+                    .map(String::trim)
+                    .toList();
+            if (!validBcc.isEmpty()) {
+                payload.put("bcc", validBcc);
+            }
         }
         if (replyTo != null && !replyTo.isBlank()) {
             payload.put("reply_to", replyTo.trim());
@@ -243,7 +257,7 @@ public class EmailService {
             log.info("Email successfully sent to {} via Resend. Status: {}", toEmail, response.statusCode());
         } else {
             log.error("Resend API rejected email to {}. Status: {}, Body: {}", toEmail, response.statusCode(), response.body());
-            throw new IllegalStateException("Resend email error: " + response.body());
+            throw new IllegalStateException("Resend email delivery failed: " + response.body());
         }
     }
 

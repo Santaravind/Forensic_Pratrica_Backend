@@ -38,8 +38,16 @@ public class PublishManuscriptRequest {
     private String finalPdfUrl;
 
     @Builder.Default
-    private boolean generateCertificates = true;
+    private Boolean generateCertificates = true;
 
     @Builder.Default
-    private boolean sendNotificationEmail = true;
+    private Boolean sendNotificationEmail = true;
+
+    public boolean isGenerateCertificates() {
+        return !Boolean.FALSE.equals(this.generateCertificates);
+    }
+
+    public boolean isSendNotificationEmail() {
+        return !Boolean.FALSE.equals(this.sendNotificationEmail);
+    }
 }
